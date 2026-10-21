@@ -1,15 +1,14 @@
 #!/bin/bash
-# Print the key facts from the credit report loaded in Orca's browser, for writing the summary.
+# Print the key facts from the credit report loaded in the local Chrome browser, for writing the summary.
 # Reads the page text directly; writes nothing to disk.
 set -euo pipefail
-O=/Applications/Orca.app/Contents/Resources/bin/orca
+source "$(dirname "$0")/lib.sh"
 
-"$O" eval --json --expression "document.body.innerText" 2>/dev/null | python3 -I -c "
+echo "document.body.innerText" | brw eval 2>/dev/null | python3 -I -c "
 import json,sys,re
-d=json.load(sys.stdin)
-if not d.get('ok'):
-    sys.exit('ERROR: Orca browser: '+d.get('error',{}).get('message','unknown')+' - sign in and load the report again')
-t=d['result']['result']
+t=sys.stdin.read()
+if not t.strip():
+    sys.exit('ERROR: browser has no page - sign in and load the report again')
 if 'Total Accounts:' not in t:
     sys.exit('ERROR: the open tab is not a loaded credit report - run load_report.sh first')
 

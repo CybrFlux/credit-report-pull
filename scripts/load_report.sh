@@ -1,22 +1,22 @@
 #!/bin/bash
-# Open the latest credit report in Orca's browser and make sure every account is shown.
+# Open the latest credit report in the local Chrome browser and make sure every account is shown.
 # The report data arrives with all accounts, but the page only renders them when its own loader
 # runs (the same loader its "Download this report" button calls). Scrolling sometimes triggers it
 # and sometimes doesn't, so call the loader directly and fall back to scrolling.
 # Usage: load_report.sh <identityiq|myscoreiq>
 set -euo pipefail
 SITE="${1:?identityiq or myscoreiq}"
-O=/Applications/Orca.app/Contents/Resources/bin/orca
+source "$(dirname "$0")/lib.sh"
 case "$SITE" in
   identityiq) HOST=member.identityiq.com ;;
   myscoreiq)  HOST=member.myscoreiq.com ;;
   *) echo "unknown site: $SITE" >&2; exit 2 ;;
 esac
 
-js() { "$O" eval --expression "$1" 2>/dev/null | tail -1; }
+js() { printf '%s' "$1" | brw eval 2>/dev/null | tail -1; }
 count() { js "(document.body.innerText.match(/Account #:/g)||[]).length"; }
 
-"$O" goto --url "https://$HOST/CreditReport.aspx" >/dev/null
+brw goto "https://$HOST/CreditReport.aspx" >/dev/null
 
 # Wait for the report data (up to ~60s)
 for i in $(seq 1 20); do
@@ -33,7 +33,7 @@ sleep 4
 if [ "$(count)" = "0" ]; then
   PREV=-1; SAME=0
   for i in $(seq 1 30); do
-    "$O" eval --expression "window.scrollBy(0, window.innerHeight*0.8)" >/dev/null 2>&1
+    js "window.scrollBy(0, window.innerHeight*0.8)" >/dev/null
     sleep 2
     N=$(count)
     if [ "$N" = "$PREV" ] && [ "$N" != "0" ]; then SAME=$((SAME+1)); else SAME=0; fi

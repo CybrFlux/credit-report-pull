@@ -11,7 +11,11 @@
 #   username / password
 #   field "SSN last 4" (concealed) = last four digits of the client's SSN
 
-O=/Applications/Orca.app/Contents/Resources/bin/orca
+# Browser: one persistent Chrome (CDP on 127.0.0.1, own profile) driven by cr_browser.py via Playwright.
+# Needs: Google Chrome, and `python3 -m pip install playwright` (uses installed Chrome, no browser download).
+# CR_HEADLESS=1 runs it without a window.
+CR_BROWSER_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/cr_browser.py"
+brw() { NODE_OPTIONS=--no-deprecation python3 "$CR_BROWSER_PY" "$@"; }
 CR_VAULT="${CR_VAULT:-Credit Reports}"
 CR_KEYCHAIN_SERVICE="op-service-account-credit-reports"
 CR_KEYCHAIN_ACCOUNT="credit-report-pull"
