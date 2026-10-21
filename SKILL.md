@@ -1,13 +1,13 @@
 ---
 name: credit-report-pull
-description: "Pull a client's 3-bureau credit report from IdentityIQ or MyScoreIQ by client name - signs in with the client's entry in the \"Credit Reports\" 1Password vault (no Touch ID), answers the SSN-last-4 question, saves the full report as a PDF on the Desktop, and writes a plain-English summary. Use when the user asks to \"pull\", \"download\", \"get\" or \"summarize\" someone's credit report, IdentityIQ or MyScoreIQ report, asks which clients are on file, or wants to add a client."
-version: 1.1.0
+description: "Pull a client's 3-bureau credit report from IdentityIQ or MyScoreIQ by client name - signs in with the client's entry in the \"Credit Reports\" 1Password vault (no Touch ID), answers the SSN-last-4 question, saves the full report as a PDF on the Desktop, writes a plain-English summary, and posts it to the Next Level Wealth portal's Cybr IQ Report page. Use when the user asks to \"pull\", \"download\", \"get\" or \"summarize\" someone's credit report, IdentityIQ or MyScoreIQ report, asks which clients are on file, or wants to add a client."
+version: 1.2.0
 author: CybrFlux / Next Level Wealth
 license: Proprietary
 platforms: [macos]
 metadata:
   hermes:
-    tags: [credit, credit-report, identityiq, myscoreiq, 1password, finance, next-level-wealth]
+    tags: [credit, credit-report, identityiq, myscoreiq, 1password, finance, next-level-wealth, portal]
     related_skills: []
 ---
 
@@ -69,10 +69,56 @@ To copy an existing 1Password login into the standard format:
 If the token is ever missing, give the user this command to run **in their own Terminal** (1Password's approval prompt only appears there):
 `${HERMES_SKILL_DIR}/scripts/setup_automation.sh G5OON3EKSZEU5JMJP7T7OMF4LI` creates the vault and the service account, and stores the token in the Keychain. The user must run `op signin` interactively (or approve 1Password CLI access in the 1Password app) before this will work — never attempt to sign in to 1Password on the user's behalf.
 
+## Post to the portal (after every pull)
+The summary also goes to the portal's **Cybr IQ Report** page (Clients section), where it links to the client by IdentityIQ member ID, then by email. Do this right after the summary, for every successful pull.
+
+1. Write the report file with the **write_file** tool (not the terminal) to `~/Library/Application Support/credit-report-pull/outbox/report.json`:
+```json
+{
+  "reportDate": "YYYY-MM-DD",
+  "scores": {"experian": 712, "equifax": 705, "transunion": 709},
+  "summary": {
+    "negativeItems": {"collections": 2, "latePayments": 3, "chargeOffs": 1},
+    "utilizationPercent": 47,
+    "inquiries": {"last2Years": 6},
+    "openAccounts": 9,
+    "oldestAccountYears": 8,
+    "topIssues": ["High utilization on 2 cards", "2 collections on all 3 bureaus"]
+  },
+  "summaryText": "The same plain-English summary you give the user: scores, negative items, what is moving the score, totals, differences between bureaus, ranked next steps."
+}
+```
+   - `reportDate` is the report date printed by the pull. Scores are whole numbers 300-850, or `null` if a bureau has none. Leave out any `summary` number the report doesn't show; never guess.
+   - Numbers and wording come only from the report. **Never** put an SSN, a full account number, or a password in this file; the script refuses digits that look like one.
+2. Run (one command):
+```
+${HERMES_SKILL_DIR}/scripts/post_to_portal.sh "<client name>"
+```
+It reads the file, adds the client's email and member ID from their 1Password entry, sends it, and deletes the file. Re-posting the same client for the same report date updates that report; it never creates a duplicate.
+
+What its output means:
+- **`posted: ... linked to the client automatically`**: done. Tell the user.
+- **`posted: ... no client matched` / `several possible clients`**: done, but an admin has to pick the client in the portal's **Needs match** tab. Tell the user, and suggest adding an `Email` or `Member ID` field to the client's 1Password entry so the next report links by itself.
+- **`PORTAL REFUSED (HTTP 401)`**: the portal secret on this Mac is wrong or was changed. Tell the user to run `setup_portal.sh` again.
+- **`STOP: ...`** (exit 1): the report file failed a check (bad score, missing summary, SSN-like digits). Fix the file and rerun.
+- **`the portal is not set up on this Mac`**: give the user the setup command below.
+- **`could not reach the portal`** (exit 7): rerun once, then report it. The PDF and summary are still valid; only the posting failed.
+
+Client email: an `Email` field on the 1Password entry, otherwise the login username when it is an email address. Member ID: a `Member ID` field on the entry (the IdentityIQ member number), when the team has it.
+
+### One-time portal setup (the user runs this in their own Terminal)
+```
+${HERMES_SKILL_DIR}/scripts/setup_portal.sh https://<project>.supabase.co/functions/v1/cybr-iq-ingest
+```
+It saves the URL in `~/Library/Application Support/credit-report-pull/portal.conf` and asks for the portal's ingest secret (typed hidden, stored in the Keychain). Never ask the user to paste the secret into chat.
+
+Tests (no network or 1Password needed): `python3 -m unittest discover -s tests`.
+
 ## Don't
 - Use a Cua Space (Chromium there doesn't accept typing), a sandboxed/cloud terminal backend, or Hermes' own browser tool or the site's "Download this report" link.
 - Run pulls from a cloud computer: IdentityIQ blocks datacenter IPs ("Access Denied - Error 15"). Run them on this Mac mini.
 - Run `op` or custom page JavaScript outside these scripts.
+- Send report text anywhere except through `post_to_portal.sh`, or keep the outbox file after a failed post longer than needed.
 
 ## Installing into Hermes
 From a clone of the `hermes-version` branch, run `scripts/install_hermes.sh`. It copies this skill to `~/.hermes/skills/finance/credit-report-pull`; rerun it after pulling updates. Needs Google Chrome, the 1Password CLI (`op`), and `python3 -m pip install playwright` on the Mac.
