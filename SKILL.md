@@ -121,4 +121,5 @@ Tests (no network or 1Password needed): `python3 -m unittest discover -s tests`.
 - Send report text anywhere except through `post_to_portal.sh`, or keep the outbox file after a failed post longer than needed.
 
 ## Installing into Hermes
+First time on a Mac: follow `SETUP.md` (or just run `scripts/bootstrap_mac.sh`); it does everything below and checks it.
 From a clone of the `hermes-version` branch, run `scripts/install_hermes.sh`. It copies this skill to `~/.hermes/skills/finance/credit-report-pull`; rerun it after pulling updates. Needs Google Chrome, the 1Password CLI (`op`), and `python3 -m pip install playwright` on the Mac.
