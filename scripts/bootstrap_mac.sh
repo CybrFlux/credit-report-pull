@@ -1,8 +1,8 @@
 #!/bin/bash
-# One-shot setup for a Mac that will run the credit-report automation under Hermes Agent.
+# One-shot setup for a Mac that will run the credit-report automation under Cybr Agent.
 # Run it in your own Terminal (it asks a few questions; secrets are typed hidden):
 #     cd ~/credit-report-pull && git checkout hermes-version && scripts/bootstrap_mac.sh
-# Installs Hermes Agent first if this Mac does not have it. Safe to re-run: it skips whatever is already done, then finishes with check_setup.sh.
+# Installs Cybr Agent first if this Mac does not have it. Safe to re-run: it skips whatever is already done, then finishes with check_setup.sh.
 set -uo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$DIR/lib.sh"
@@ -12,27 +12,28 @@ yes()  { local a; read -r -p "$1 [y/N] " a; [[ "$a" =~ ^[Yy] ]]; }
 NEED=()
 
 [ "$(uname)" = "Darwin" ] || { echo "This setup is for macOS."; exit 1; }
-[ "$(uname -m)" = "arm64" ] || { echo "Hermes needs an Apple Silicon Mac (M1 or newer); this one is $(uname -m)."; exit 1; }
+[ "$(uname -m)" = "arm64" ] || { echo "Cybr Agent needs an Apple Silicon Mac (M1 or newer); this one is $(uname -m)."; exit 1; }
 
-say "0. Hermes Agent"
-HH="${HERMES_HOME:-$HOME/.hermes}"
-if command -v hermes >/dev/null || [ -x "$HOME/.local/bin/hermes" ] || [ -d "$HH/hermes-agent" ]; then
-  echo "Hermes is already installed"
+say "0. Cybr Agent"
+HH="${HERMES_HOME:-$HOME/.hermes}"   # the data folder keeps its internal name
+CYBR_INSTALLER="https://raw.githubusercontent.com/CybrFlux/cybr-agent-cli/main/scripts/install.sh"
+export PATH="$HOME/.local/bin:$PATH"
+if command -v cybr >/dev/null; then
+  echo "Cybr Agent is already installed ($(cybr --version 2>/dev/null | head -1))"
 else
-  echo "Hermes Agent is not on this Mac yet. The official installer is:"
-  echo "    curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash"
+  echo "Cybr Agent is not on this Mac yet. It installs from CybrFlux's repository (needs git access to it):"
+  echo "    HERMES_REPO_URL=https://github.com/CybrFlux/cybr-agent-cli.git bash <(curl -fsSL $CYBR_INSTALLER) --channel main"
   if yes "Run it now?"; then
-    curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash || { echo "The Hermes installer failed - see the message above."; exit 1; }
-    export PATH="$HOME/.local/bin:$PATH"
-  else echo "Install Hermes, then run this script again."; exit 1; fi
+    HERMES_REPO_URL=https://github.com/CybrFlux/cybr-agent-cli.git bash <(curl -fsSL "$CYBR_INSTALLER") --channel main \
+      || { echo "The Cybr Agent installer failed - see the message above."; exit 1; }
+  else echo "Install Cybr Agent, then run this script again."; exit 1; fi
 fi
-[ -d "$HH" ] || { echo "Hermes installed, but $HH was not created. Open a NEW Terminal window and run this script again."; exit 1; }
+command -v cybr >/dev/null || { echo "Cybr Agent installed, but the 'cybr' command is not on this Terminal's PATH yet. Open a NEW Terminal window and run this script again."; exit 1; }
 if [ ! -f "$HH/config.yaml" ] || ! grep -qE '^\s*provider:' "$HH/config.yaml" 2>/dev/null; then
-  echo "Hermes still needs a model. Pick a strong one (e.g. Claude Sonnet): a weak or free model will fumble the sign-in steps."
-  if yes "Run the Hermes setup wizard now (it asks for your provider and API key)?"; then
-    { command -v hermes >/dev/null && hermes setup; } || "$HOME/.local/bin/hermes" setup || NEED+=("Run: hermes setup")
-  else NEED+=("Run: hermes setup  (choose a model and add its API key)"); fi
-else echo "a model is already configured (change it any time with: hermes model)"; fi
+  echo "Cybr Agent still needs a model. Pick a strong one (e.g. Claude Sonnet): a weak or free model will fumble the sign-in steps."
+  if yes "Run the setup wizard now (it asks for your provider and API key)?"; then cybr setup || NEED+=("Run: cybr setup")
+  else NEED+=("Run: cybr setup  (choose a model and add its API key)"); fi
+else echo "a model is already configured (change it any time with: cybr model)"; fi
 
 say "1. Google Chrome"
 if [ -d "/Applications/Google Chrome.app" ]; then echo "already installed"
@@ -48,8 +49,8 @@ say "3. Playwright (drives Chrome)"
 if python3 -c "import playwright" 2>/dev/null; then echo "already installed"
 else python3 -m pip install --user --quiet playwright && echo "installed" || NEED+=("Run: python3 -m pip install --user playwright"); fi
 
-say "4. Install the skill into Hermes"
-"$DIR/install_hermes.sh" || NEED+=("scripts/install_hermes.sh failed - see the message above")
+say "4. Install the skill into Cybr Agent"
+"$DIR/install_skill.sh" || NEED+=("scripts/install_skill.sh failed - see the message above")
 
 say "5. 1Password access for the automation"
 if security find-generic-password -s "$CR_KEYCHAIN_SERVICE" -a "$CR_KEYCHAIN_ACCOUNT" >/dev/null 2>&1; then

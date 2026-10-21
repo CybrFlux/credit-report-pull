@@ -13,7 +13,7 @@ echo "This Mac"
 [ -d "/Applications/Google Chrome.app" ] && ok "Google Chrome" || bad "Google Chrome is missing" "install it from google.com/chrome (the pull drives a real Chrome window)"
 command -v op >/dev/null && ok "1Password CLI (op)" || bad "1Password CLI is missing" "brew install 1password-cli, or download it from developer.1password.com/docs/cli/get-started"
 python3 -c "import playwright" 2>/dev/null && ok "Playwright (python)" || bad "Playwright is missing" "python3 -m pip install --user playwright"
-[ -x "${HERMES_HOME:-$HOME/.hermes}/skills/finance/credit-report-pull/scripts/pull_report.sh" ] && ok "skill installed in Hermes" || bad "skill is not installed in Hermes" "run scripts/install_hermes.sh from this repo"
+[ -x "${HERMES_HOME:-$HOME/.hermes}/skills/finance/credit-report-pull/scripts/pull_report.sh" ] && ok "skill installed in Cybr Agent" || bad "skill is not installed in Cybr Agent" "run scripts/install_skill.sh from this repo"
 
 echo "1Password"
 if command -v op >/dev/null && cr_load_token 2>/dev/null; then
@@ -38,5 +38,5 @@ if cr_load_portal 2>/dev/null; then
 else bad "the portal is not set up on this Mac" "run scripts/setup_portal.sh <ingest URL> (or scripts/bootstrap_mac.sh)"; fi
 
 echo
-if [ "$BAD" -eq 0 ]; then echo "All set. Ask Hermes: \"pull the credit report for <client name>\"."; else echo "$BAD thing(s) to fix (see → lines above)."; fi
+if [ "$BAD" -eq 0 ]; then echo "All set. Ask Cybr Agent: \"pull the credit report for <client name>\"."; else echo "$BAD thing(s) to fix (see → lines above)."; fi
 exit $((BAD>0))
