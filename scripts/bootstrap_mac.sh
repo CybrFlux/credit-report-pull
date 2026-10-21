@@ -2,7 +2,7 @@
 # One-shot setup for a Mac that will run the credit-report automation under Hermes Agent.
 # Run it in your own Terminal (it asks a few questions; secrets are typed hidden):
 #     cd ~/credit-report-pull && git checkout hermes-version && scripts/bootstrap_mac.sh
-# Safe to re-run: it skips whatever is already done, then finishes with check_setup.sh.
+# Installs Hermes Agent first if this Mac does not have it. Safe to re-run: it skips whatever is already done, then finishes with check_setup.sh.
 set -uo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$DIR/lib.sh"
@@ -12,7 +12,27 @@ yes()  { local a; read -r -p "$1 [y/N] " a; [[ "$a" =~ ^[Yy] ]]; }
 NEED=()
 
 [ "$(uname)" = "Darwin" ] || { echo "This setup is for macOS."; exit 1; }
-[ -d "$HOME/.hermes" ] || { echo "Hermes Agent is not installed on this Mac (no ~/.hermes). Install Hermes first, then run this again."; exit 1; }
+[ "$(uname -m)" = "arm64" ] || { echo "Hermes needs an Apple Silicon Mac (M1 or newer); this one is $(uname -m)."; exit 1; }
+
+say "0. Hermes Agent"
+HH="${HERMES_HOME:-$HOME/.hermes}"
+if command -v hermes >/dev/null || [ -x "$HOME/.local/bin/hermes" ] || [ -d "$HH/hermes-agent" ]; then
+  echo "Hermes is already installed"
+else
+  echo "Hermes Agent is not on this Mac yet. The official installer is:"
+  echo "    curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash"
+  if yes "Run it now?"; then
+    curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash || { echo "The Hermes installer failed - see the message above."; exit 1; }
+    export PATH="$HOME/.local/bin:$PATH"
+  else echo "Install Hermes, then run this script again."; exit 1; fi
+fi
+[ -d "$HH" ] || { echo "Hermes installed, but $HH was not created. Open a NEW Terminal window and run this script again."; exit 1; }
+if [ ! -f "$HH/config.yaml" ] || ! grep -qE '^\s*provider:' "$HH/config.yaml" 2>/dev/null; then
+  echo "Hermes still needs a model. Pick a strong one (e.g. Claude Sonnet): a weak or free model will fumble the sign-in steps."
+  if yes "Run the Hermes setup wizard now (it asks for your provider and API key)?"; then
+    { command -v hermes >/dev/null && hermes setup; } || "$HOME/.local/bin/hermes" setup || NEED+=("Run: hermes setup")
+  else NEED+=("Run: hermes setup  (choose a model and add its API key)"); fi
+else echo "a model is already configured (change it any time with: hermes model)"; fi
 
 say "1. Google Chrome"
 if [ -d "/Applications/Google Chrome.app" ]; then echo "already installed"
